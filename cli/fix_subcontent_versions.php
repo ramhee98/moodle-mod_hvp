@@ -41,6 +41,7 @@ list($options, $unrecognized) = cli_get_params([
     'help'      => false,
     'fix'       => false,
     'contentid' => '',
+    'courseid'  => '',
     'since'     => '',
     'upgraded'  => false,
     'backup'    => '',
@@ -63,6 +64,8 @@ Options:
       --fix           Actually write the repaired parameters. Without this the
                       script only reports (dry run).
       --contentid=1,2 Limit to these {hvp}.id values.
+      --courseid=1,2  Limit to activities in these courses. Accepts course ids
+                      or course shortnames.
       --upgraded      Limit to content that has a 'content upgrade' entry in
                       {hvp_events} (i.e. content touched by a batch upgrade).
       --since=TIME    With --upgraded, only events at/after TIME. Accepts a unix
@@ -75,6 +78,8 @@ Options:
 Examples:
   php mod/hvp/cli/fix_subcontent_versions.php
   php mod/hvp/cli/fix_subcontent_versions.php --upgraded --since="2026-06-25"
+  php mod/hvp/cli/fix_subcontent_versions.php --courseid=42 -v
+  php mod/hvp/cli/fix_subcontent_versions.php --courseid=42 --fix
   php mod/hvp/cli/fix_subcontent_versions.php --upgraded --fix
 
 EOT;
@@ -321,6 +326,32 @@ if ($options['contentid'] !== '') {
     }
     list($insql, $inparams) = $DB->get_in_or_equal($ids);
     $where[] = "c.id $insql";
+    $params = array_merge($params, $inparams);
+}
+
+if ($options['courseid'] !== '') {
+    $courseids = [];
+    foreach (explode(',', $options['courseid']) as $needle) {
+        $needle = trim($needle);
+        if ($needle === '') {
+            continue;
+        }
+        if (is_numeric($needle)) {
+            $course = $DB->get_record('course', ['id' => (int)$needle], 'id, shortname, fullname');
+        } else {
+            $course = $DB->get_record('course', ['shortname' => $needle], 'id, shortname, fullname');
+        }
+        if (!$course) {
+            cli_error("No course matches '{$needle}'.");
+        }
+        $courseids[] = $course->id;
+        cli_writeln("Limiting to course {$course->id}: {$course->fullname} ({$course->shortname})");
+    }
+    if (empty($courseids)) {
+        cli_error('--courseid did not contain any usable ids or shortnames.');
+    }
+    list($insql, $inparams) = $DB->get_in_or_equal($courseids);
+    $where[] = "c.course $insql";
     $params = array_merge($params, $inparams);
 }
 
