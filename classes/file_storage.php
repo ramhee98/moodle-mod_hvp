@@ -861,13 +861,23 @@ class file_storage implements \H5PFileStorage {
     /**
      * Check if upgrades script exist for library.
      *
-     * @param string $machineName
-     * @param int $majorVersion
-     * @param int $minorVersion
+     * @param array|string $library Library data, or the machine name when called with the legacy signature
+     * @param int $majorversion Only used with the legacy signature
+     * @param int $minorversion Only used with the legacy signature
      * @return string Relative path
      */
     // @codingStandardsIgnoreLine
-    public function getUpgradeScript($library) {
+    public function getUpgradeScript($library, $majorversion = null, $minorversion = null) {
+        if (!is_array($library)) {
+            // Older versions of the H5P editor library still pass the library
+            // parts as separate arguments instead of the full library array.
+            $library = array(
+                'machineName' => $library,
+                'majorVersion' => $majorversion,
+                'minorVersion' => $minorversion
+            );
+        }
+
         $context = \context_system::instance();
         $fs = get_file_storage();
         $area = 'libraries';
